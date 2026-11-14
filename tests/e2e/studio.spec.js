@@ -1,0 +1,41 @@
+import { test, expect } from '@playwright/test';
+import { freshPage, addFixture } from './helpers.js';
+test.setTimeout(10 * 60 * 1000);
+test.beforeEach(({ page }) => { page.on('console', (m) => { if (!m.text().includes('cpuid')) console.log('C:', m.text().slice(0, 160)); }); page.on('pageerror', (e) => console.log('PE:', e.message)); });
+
+test('Studio: Minus One dengan AI, simpan hasil, Suno', async ({ page }) => {
+  await page.setViewportSize({ width: 412, height: 900 });
+  await freshPage(page);
+  await addFixture(page, 'mix-10s.mp3');
+  await page.getByRole('button', { name: 'Perpustakaan' }).click();
+  await page.getByRole('button', { name: 'Studio mix-10s' }).click();
+  await expect(page.locator('#studio')).toHaveClass(/active/);
+  await page.getByRole('button', { name: 'Minus One' }).click();
+  console.log('step: asingkan'); await page.getByRole('button', { name: '✨ Asingkan dengan AI' }).click();
+  const dl = page.getByRole('button', { name: 'Muat turun' });
+  await dl.waitFor({ timeout: 5000 }).then(() => dl.click()).catch(() => {});
+  await expect(page.locator('.progress')).toBeVisible();
+  await page.screenshot({ path: 'test-results/studio-ai.png' });
+  await expect(page.locator('.toast', { hasText: 'Siap' })).toBeVisible({ timeout: 8 * 60 * 1000 });
+  await expect(page.getByRole('button', { name: 'Minus One' })).toHaveClass(/on/);
+  expect(await page.evaluate(() => window.__lepak.engine.state.gains)).toEqual({ drums: 1, bass: 1, other: 1, vocals: 0 });
+  await page.getByRole('button', { name: 'Vokal Saja' }).click();
+  expect(await page.evaluate(() => window.__lepak.engine.state.gains)).toEqual({ drums: 0, bass: 0, other: 0, vocals: 1 });
+  await page.getByRole('button', { name: 'Dram', exact: true }).click(); // suis dram -> mod pilih
+  await expect(page.getByRole('button', { name: 'Pilih Instrumen' })).toHaveClass(/on/);
+  await page.locator('[data-preset="slowed"]').click();
+  await page.locator('#saveBtn').click();
+  await expect(page.locator('.toast', { hasText: 'Disimpan' })).toBeVisible({ timeout: 60000 });
+  await page.screenshot({ path: 'test-results/studio-done.png', fullPage: true });
+  await page.getByRole('button', { name: /AI-kan di Suno/ }).click();
+  await expect(page.getByRole('button', { name: 'Buka Suno' })).toBeVisible();
+  await page.getByRole('button', { name: 'Tutup' }).click();
+  await page.getByRole('button', { name: 'Perpustakaan' }).click();
+  await expect(page.locator('.song')).toHaveCount(2);
+  await expect(page.locator('.song .t').first()).toContainText('Slowed + Reverb');
+  await expect(page.locator('.song .tag', { hasText: 'AI ✓' })).toBeVisible();
+  await page.getByRole('button', { name: 'Pemain' }).click();
+  await page.screenshot({ path: 'test-results/pemain.png' });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.screenshot({ path: 'test-results/laptop.png' });
+});
