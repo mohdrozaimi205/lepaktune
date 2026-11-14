@@ -1,0 +1,20 @@
+import { test, expect } from '@playwright/test';
+import { freshPage, addFixture } from './helpers.js';
+test('main, media session, terus main bila tersorok, lagu seterusnya', async ({ page }) => {
+  await freshPage(page);
+  await addFixture(page, 'tone-10s.mp3');
+  await page.locator('#fileInput').setInputFiles('tests/fixtures/mix-10s.mp3');
+  await expect(page.locator('.song')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Main tone-10s' }).click();
+  await page.waitForFunction(() => window.__lepak.engine.playing && window.__lepak.engine.position > 0.5);
+  expect(await page.evaluate(() => navigator.mediaSession.metadata?.title)).toBe('tone-10s');
+  expect(await page.evaluate(() => document.getElementById('keepalive').paused)).toBe(false);
+  await page.evaluate(() => { Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true }); document.dispatchEvent(new Event('visibilitychange')); });
+  const p1 = await page.evaluate(() => window.__lepak.engine.position);
+  await page.waitForTimeout(800);
+  const p2 = await page.evaluate(() => window.__lepak.engine.position);
+  expect(p2).toBeGreaterThan(p1 + 0.4);
+  expect(await page.evaluate(() => window.__lepak.engine.ctx.state)).toBe('running');
+  await page.getByRole('button', { name: 'Seterusnya' }).click();
+  await page.waitForFunction(() => window.__lepak.app.current?.title === 'mix-10s');
+});
